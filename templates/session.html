@@ -20,40 +20,31 @@
 
     <!-- Preview ao vivo -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        Preview da Câmera
-      </label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Preview da Câmera</label>
       <img src="{{ url_for('video_feed', slug=slug) }}"
            class="w-full h-auto border rounded">
     </div>
 
-    <!-- Estatísticas -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        Páginas capturadas: <strong>{{ raw|length }}</strong>
-      </div>
-      <div>
-        Páginas processadas: <strong>{{ processed|length }}</strong>
-      </div>
-    </div>
 
-    <!-- Miniaturas -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        Últimas Capturas
-      </label>
-      {% if raw %}
-        <div class="grid grid-cols-3 gap-2">
-          {% for img in raw[-3:] %}
-            <img src="{{ url_for('serve_raw', slug=slug, filename=img) }}"
-                 alt="Página {{ img }}"
-                 class="border rounded-md">
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="text-gray-500">Nenhuma captura ainda.</p>
-      {% endif %}
+    <!-- Contagens dinâmicas -->
+    <div id="stats"
+      hx-get="{{ url_for('counts', slug=slug) }}"
+      hx-trigger="every 1s"
+      hx-swap="innerHTML">
+    <!-- opcional: conteúdo inicial -->
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>Páginas capturadas:<br><strong>{{ raw|length }}</strong></div>
+      <div>Páginas processadas:<br><strong>{{ processed|length }}</strong></div>
     </div>
+  </div>
+
+    <!-- Miniaturas estáticas ou HTMX similar -->
+  <div id="thumbs"
+      hx-get="{{ url_for('thumbs', slug=slug) }}"
+      hx-trigger="every 2s"
+      hx-swap="innerHTML">
+    <!-- já será trocado pelo snippet de /thumbs/<slug> -->
+  </div>
 
     <!-- Controles -->
     <div class="flex flex-wrap gap-4">
@@ -67,7 +58,6 @@
         Voltar ao Dashboard
       </a>
     </div>
-
   </div>
 </body>
 </html>

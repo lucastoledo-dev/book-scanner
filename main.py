@@ -2,7 +2,8 @@ import os
 import json
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    send_from_directory, Response
+    send_from_directory, Response,
+    render_template_string    # ← adicione isto
 )
 import cv2
 from capture import CaptureThread
@@ -85,73 +86,25 @@ def view_session(slug):
                            processed=processed,
                            camera_label=camera_label)
 
-# @app.route("/video_feed/<slug>")
-# def video_feed(slug):
-#     """
-#     Gera um stream MJPEG usando o último frame da CaptureThread.
-#     """
-#     if slug not in threads:
-#         return "Sessão não encontrada", 404
-
-#     cap_thread = threads[slug][0]
-
-#     def gen():
-#         while True:
-#             frame = cap_thread.get_frame()
-#             if frame is None:
-#                 time.sleep(0.1)
-#                 continue
-#             ret, jpeg = cv2.imencode(".jpg", frame)
-#             if not ret:
-#                 time.sleep(0.1)
-#                 continue
-#             yield (b"--frame\r\n"
-#                    b"Content-Type: image/jpeg\r\n\r\n" +
-#                    jpeg.tobytes() + b"\r\n")
-
-#     return Response(
-#         gen(),
-#         mimetype="multipart/x-mixed-replace; boundary=frame"
-#     )
-
-import time
-import cv2
-from flask import Response
-
 @app.route("/video_feed/<slug>")
 def video_feed(slug):
-    """
-    Stream MJPEG com overlay de contorno da página em verde.
-    """
+    """MJPEG do último frame com contorno marcado em VERMELHO."""
     if slug not in threads:
         return "Sessão não encontrada", 404
-
     cap_thread = threads[slug][0]
 
     def gen():
         while True:
-            frame = cap_thread.get_frame()
+            frame   = cap_thread.get_frame()
+            contour = cap_thread.get_contour()
             if frame is None:
                 time.sleep(0.1)
                 continue
 
-            # --- DETECÇÃO DO CONTORNO DA PÁGINA ---
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # binariza invertido para realçar bordas brancas do papel
-            _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
-            cnts, _  = cv2.findContours(thresh,
-                          cv2.RETR_EXTERNAL,
-                          cv2.CHAIN_APPROX_SIMPLE)
-            if cnts:
-                # pega maior contorno (provável página)
-                c = max(cnts, key=cv2.contourArea)
-                # aproxima contorno para polígono
-                peri = cv2.arcLength(c, True)
-                approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-                # desenha polilinha verde de espessura 2
-                cv2.polylines(frame, [approx], True, (0,255,0), 2)
+            # desenha contorno em vermelho
+            if contour is not None:
+                cv2.polylines(frame, [contour], True, (0,0,255), 2)
 
-            # --- CODIFICAÇÃO E ENVIO DO FRAME ---
             ret, jpeg = cv2.imencode(".jpg", frame)
             if not ret:
                 time.sleep(0.1)
@@ -164,21 +117,32 @@ def video_feed(slug):
                 b"\r\n"
             )
 
-    return Response(
-        gen(),
-        mimetype="multipart/x-mixed-replace; boundary=frame"
-    )
+    return Response(gen(),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
 
+@app.route("/thumbs/<slug>")
+def thumbs(slug):
+    raw_dir = os.path.join(SESSIONS_DIR, slug, "raw")
+    imgs = sorted(os.listdir(raw_dir))[-5:]
+    tpl = """
+    <div class="grid grid-cols-5 gap-2 mb-4">
+      {% for img in imgs %}
+        <img src="{{ url_for('serve_raw', slug=slug, filename=img) }}"
+             alt="Página {{ img }}"
+             class="border rounded-md">
+      {% endfor %}
+    </div>
+    """
+    return render_template_string(tpl, slug=slug, imgs=imgs)
 
 @app.route("/sessions/<slug>/raw/<filename>")
 def serve_raw(slug, filename):
-    path = os.path.join(SESSIONS_DIR, slug, "raw")
-    return send_from_directory(path, filename)
+    """
+    Serve arquivos brutos (.jpg) da pasta raw/ de uma sessão.
+    """
+    raw_dir = os.path.join(SESSIONS_DIR, slug, "raw")
+    return send_from_directory(raw_dir, filename)
 
-@app.route("/sessions/<slug>/processed/<filename>")
-def serve_processed(slug, filename):
-    path = os.path.join(SESSIONS_DIR, slug, "processed")
-    return send_from_directory(path, filename)
 
 @app.route("/finalize/<slug>", methods=["POST"])
 def finalize(slug):
@@ -191,6 +155,27 @@ def finalize(slug):
 def download(slug):
     path = os.path.join(SESSIONS_DIR, slug, "final")
     return send_from_directory(path, "scan.pdf", as_attachment=True)
+
+@app.route("/counts/<slug>")
+def counts(slug):
+    """
+    Retorna um trecho de HTML com as contagens de raw/ e processed/ para HTMX.
+    """
+    sess_path = os.path.join(SESSIONS_DIR, slug)
+    raw_dir       = os.path.join(sess_path, "raw")
+    processed_dir = os.path.join(sess_path, "processed")
+
+    raw_count       = len(os.listdir(raw_dir)) if os.path.isdir(raw_dir) else 0
+    processed_count = len(os.listdir(processed_dir)) if os.path.isdir(processed_dir) else 0
+
+    # devolve um snippet com grid de duas colunas
+    return f"""
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>Páginas capturadas:<br><strong>{raw_count}</strong></div>
+      <div>Páginas processadas:<br><strong>{processed_count}</strong></div>
+    </div>
+    """
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
