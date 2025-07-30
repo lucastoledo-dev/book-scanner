@@ -1,10 +1,7 @@
 import os
 import json
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    send_from_directory, Response,
-    render_template_string    # ← adicione isto
-)
+from flask import Flask, render_template, request, redirect, url_for, \
+                  send_from_directory, Response, render_template_string, jsonify
 import cv2
 from capture import CaptureThread
 from pipeline import PipelineThread
@@ -18,6 +15,19 @@ os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 # Guarda as threads de cada sessão
 threads: dict[str, tuple[CaptureThread, PipelineThread, FinalizeThread]] = {}
+
+# logo após iniciar as threads, adicionamos:
+@app.route("/set_roi/<slug>", methods=["POST"])
+def set_roi(slug):
+    """
+    Recebe JSON {x,y,w,h} em pixels, relativo ao preview, e avisa a CaptureThread.
+    """
+    data = request.get_json()
+    if slug in threads:
+        cap, _, _ = threads[slug]
+        cap.set_roi(int(data['x']), int(data['y']), int(data['w']), int(data['h']))
+        return ('',204)
+    return ('Session not found',404)
 
 @app.route("/", methods=["GET"])
 def dashboard():
@@ -94,32 +104,26 @@ def video_feed(slug):
 
     def gen():
         while True:
-            frame   = cap_thread.get_frame()
-            contour = cap_thread.get_contour()
+            frame = cap_thread.get_frame()
+            roi   = cap_thread.get_roi()
             if frame is None:
-                time.sleep(0.1)
-                continue
+                time.sleep(0.1); continue
 
-            # desenha o contorno em vermelho
-            if contour is not None:
-                cv2.polylines(frame, [contour], True, (0,0,255), 2)
+            # desenha retângulo da ROI em VERDE
+            if roi:
+                x,y,w,h = roi
+                cv2.rectangle(frame, (x,y), (x+w, y+h), (0,255,0), 2)
 
-            ret, jpeg = cv2.imencode(".jpg", frame)
+            # encode
+            ret, jpeg = cv2.imencode('.jpg', frame)
             if not ret:
-                time.sleep(0.1)
-                continue
+                time.sleep(0.1); continue
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n"+
+                   jpeg.tobytes()+b"\r\n")
 
-            yield (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n\r\n" +
-                jpeg.tobytes() +
-                b"\r\n"
-            )
-
-    return Response(
-        gen(),
-        mimetype="multipart/x-mixed-replace; boundary=frame"
-    )
+    return Response(gen(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route("/thumbs/<slug>")
 def thumbs(slug):

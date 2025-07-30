@@ -6,53 +6,117 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
         rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@1.8.5"></script>
+  <style>
+    #preview-container { position: relative; display: inline-block; }
+    #selection {
+      position: absolute;
+      border: 2px dashed #0f0;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6">
-  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6 space-y-6">
+<body class="p-6 bg-gray-100">
+  <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow space-y-6">
 
-    <h1 class="text-3xl font-bold text-gray-800">Sessão: {{ slug }}</h1>
+    <h1 class="text-2xl font-bold">Sessão: {{ slug }}</h1>
 
-    <!-- Exibe o nome (label) da câmera selecionada -->
-    <p class="text-gray-700">
-      <span class="font-medium">Fonte de Vídeo:</span>
-      <span class="font-semibold">{{ camera_label }}</span>
-    </p>
+    <!-- Fonte de vídeo -->
+    <p>Fonte: <strong>{{ camera_label }}</strong></p>
 
-<!-- Preview ao vivo -->
-<div>
-  <label class="block text-sm font-medium text-gray-700 mb-1">Preview da Câmera</label>
-  <img src="{{ url_for('video_feed', slug=slug) }}"
-       class="w-full h-auto border rounded">
-</div>
+    <!-- Preview + Canvas para desenhar ROI -->
+    <div id="preview-container">
+      <img id="preview"
+           src="{{ url_for('video_feed', slug=slug) }}"
+           class="border rounded w-full h-auto">
+      <div id="selection"></div>
+    </div>
 
+    <!-- Botão para confirmar ROI -->
+    <button id="btn-set-roi"
+            class="mt-2 bg-blue-600 text-white px-4 py-2 rounded">
+      Confirmar Área de Captura
+    </button>
 
-<div id="stats"
-     hx-get="{{ url_for('counts', slug=slug) }}"
-     hx-trigger="every 1s"
-     hx-swap="innerHTML">
-  <!-- estatísticas iniciais, opcional -->
-</div>
+    <!-- Estatísticas -->
+    <div id="stats"
+         hx-get="{{ url_for('counts', slug=slug) }}"
+         hx-trigger="every 1s"
+         hx-swap="innerHTML">
+      <!-- conteudo inicial -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>Páginas capturadas:<br><strong>{{ raw|length }}</strong></div>
+        <div>Páginas processadas:<br><strong>{{ processed|length }}</strong></div>
+      </div>
+    </div>
 
-    <!-- Miniaturas estáticas ou HTMX similar -->
-<div id="thumbs"
-     hx-get="{{ url_for('thumbs', slug=slug) }}"
-     hx-trigger="every 2s"
-     hx-swap="innerHTML">
-  <!-- loading placeholder -->
-</div>
+    <!-- Miniaturas -->
+    <div id="thumbs"
+         hx-get="{{ url_for('thumbs', slug=slug) }}"
+         hx-trigger="every 2s"
+         hx-swap="innerHTML">
+      <!-- placeholder -->
+      <p class="text-gray-500">Carregando miniaturas…</p>
+    </div>
 
-    <!-- Controles -->
-    <div class="flex flex-wrap gap-4">
+    <!-- Controles finais -->
+    <div class="flex gap-4">
       <button hx-post="{{ url_for('finalize', slug=slug) }}"
               hx-swap="none"
-              class="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded shadow">
+              class="bg-green-600 text-white px-4 py-2 rounded">
         Finalizar Sessão
       </button>
       <a href="{{ url_for('dashboard') }}"
-         class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-5 py-2 rounded shadow">
-        Voltar ao Dashboard
+         class="bg-gray-300 text-gray-800 px-4 py-2 rounded">
+        Voltar
       </a>
     </div>
+
   </div>
+
+  <script>
+    // ROI drawing logic
+    const preview = document.getElementById('preview');
+    const sel     = document.getElementById('selection');
+    const btn     = document.getElementById('btn-set-roi');
+    let startX, startY, selX, selY, selW, selH, drawing=false;
+
+    preview.addEventListener('mousedown', e => {
+      drawing = true;
+      const r = preview.getBoundingClientRect();
+      startX = e.clientX - r.left;
+      startY = e.clientY - r.top;
+      sel.style.left = startX+'px';
+      sel.style.top  = startY+'px';
+      sel.style.width = '0px';
+      sel.style.height = '0px';
+      sel.style.display = 'block';
+    });
+    preview.addEventListener('mousemove', e => {
+      if (!drawing) return;
+      const r = preview.getBoundingClientRect();
+      let x = e.clientX - r.left, y = e.clientY - r.top;
+      selX = Math.min(x, startX);
+      selY = Math.min(y, startY);
+      selW = Math.abs(x - startX);
+      selH = Math.abs(y - startY);
+      sel.style.left   = selX+'px';
+      sel.style.top    = selY+'px';
+      sel.style.width  = selW+'px';
+      sel.style.height = selH+'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (drawing) drawing = false;
+    });
+
+    btn.addEventListener('click', () => {
+      // envia ROI ao servidor
+      fetch(`{{ url_for('set_roi', slug=slug) }}`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ x:selX, y:selY, w:selW, h:selH })
+      }).then(()=> alert('Área definida!'))
+    });
+  </script>
 </body>
 </html>
