@@ -88,7 +88,6 @@ def view_session(slug):
 
 @app.route("/video_feed/<slug>")
 def video_feed(slug):
-    """MJPEG do último frame com contorno marcado em VERMELHO."""
     if slug not in threads:
         return "Sessão não encontrada", 404
     cap_thread = threads[slug][0]
@@ -101,7 +100,7 @@ def video_feed(slug):
                 time.sleep(0.1)
                 continue
 
-            # desenha contorno em vermelho
+            # desenha o contorno em vermelho
             if contour is not None:
                 cv2.polylines(frame, [contour], True, (0,0,255), 2)
 
@@ -117,8 +116,10 @@ def video_feed(slug):
                 b"\r\n"
             )
 
-    return Response(gen(),
-                    mimetype="multipart/x-mixed-replace; boundary=frame")
+    return Response(
+        gen(),
+        mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
 
 @app.route("/thumbs/<slug>")
 def thumbs(slug):
