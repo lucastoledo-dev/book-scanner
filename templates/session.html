@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Sessão {{ slug }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+        rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@1.8.5"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6 space-y-6">
+
+    <h1 class="text-3xl font-bold text-gray-800">Sessão: {{ slug }}</h1>
+
+    <!-- Exibe o nome (label) da câmera selecionada -->
+    <p class="text-gray-700">
+      <span class="font-medium">Fonte de Vídeo:</span>
+      <span class="font-semibold">{{ camera_label }}</span>
+    </p>
+
+    <!-- Preview ao vivo -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Preview da Câmera
+      </label>
+      <img src="{{ url_for('video_feed', slug=slug) }}"
+           class="w-full h-auto border rounded">
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        Páginas capturadas: <strong>{{ raw|length }}</strong>
+      </div>
+      <div>
+        Páginas processadas: <strong>{{ processed|length }}</strong>
+      </div>
+    </div>
+
+    <!-- Miniaturas -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Últimas Capturas
+      </label>
+      {% if raw %}
+        <div class="grid grid-cols-3 gap-2">
+          {% for img in raw[-3:] %}
+            <img src="{{ url_for('serve_raw', slug=slug, filename=img) }}"
+                 alt="Página {{ img }}"
+                 class="border rounded-md">
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-gray-500">Nenhuma captura ainda.</p>
+      {% endif %}
+    </div>
+
+    <!-- Controles -->
+    <div class="flex flex-wrap gap-4">
+      <button hx-post="{{ url_for('finalize', slug=slug) }}"
+              hx-swap="none"
+              class="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded shadow">
+        Finalizar Sessão
+      </button>
+      <a href="{{ url_for('dashboard') }}"
+         class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-5 py-2 rounded shadow">
+        Voltar ao Dashboard
+      </a>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Finalizar Sessão</title>
+  <link href="{{ url_for('static', filename='css/tailwind.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='js/htmx.min.js') }}"></script>
+</head>
+<body class="p-4">
+  <h1 class="text-2xl font-bold mb-4">Revisar e Gerar PDF</h1>
+  <!-- Aqui futuramente drag-drop de páginas -->
+  <a href="{{ url_for('download', slug=slug) }}" class="bg-blue-500 text-white px-4 py-2 rounded">Baixar PDF</a>
+</body>
+</html>
