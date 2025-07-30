@@ -1,0 +1,50 @@
+# Virtualenvs
+venv/
+.env/
+env/
+ENV/
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Editor folders
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+*.whl
+
+# Logs
+pip-log.txt
+
+# Session data (imagens e PDFs gerados)
+data/sessions/
+
+# Tesseract output
+*.txt
+
+# Flask instance folder
+instance/
+
+# Mac / Linux swap files
+*~
